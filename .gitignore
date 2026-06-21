@@ -1,0 +1,39 @@
+# ---- dependencies ----
+node_modules/
+.pnp
+.pnp.js
+
+# ---- build output ----
+dist/
+dist-ssr/
+release/
+*.local
+
+# ---- large / native / runtime artifacts (regenerate; see README) ----
+# bundled llama.cpp binary + shared libs (build llama.cpp and copy in)
+native/
+# the GGUF model is multi-GB — published on Hugging Face, not committed
+models/*
+!models/.gitkeep
+
+# ---- logs ----
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ---- editor / OS ----
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ---- env ----
+.env
+.env.*
+!.env.example

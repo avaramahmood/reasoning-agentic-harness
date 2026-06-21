@@ -1,0 +1,52 @@
+{
+  "name": "reasoning-agent-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "On-device Tool-Integrated Reasoning agent over a local GGUF via llama.cpp",
+  "author": "Your Team <your-email@example.com>",
+  "homepage": "https://github.com/your-team/reasoning-agent",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "control": "node server/control.mjs",
+    "server": "bash scripts/run-llama-server.sh",
+    "electron": "electron .",
+    "dist": "npm run build && electron-builder --linux"
+  },
+  "dependencies": {
+    "katex": "^0.16.11",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.13",
+    "@types/katex": "^0.16.7",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^32.2.0",
+    "electron-builder": "^25.1.8",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.7.2",
+    "vite": "^7.1.5"
+  },
+  "build": {
+    "appId": "com.reasoningagent.app",
+    "productName": "Reasoning Agent",
+    "directories": { "output": "release" },
+    "files": ["dist/**", "electron/**", "package.json"],
+    "extraResources": [
+      { "from": "server", "to": "server" },
+      { "from": "native/linux", "to": "native/linux" }
+    ],
+    "linux": {
+      "target": ["deb", "AppImage"],
+      "category": "Utility",
+      "maintainer": "Your Team <your-email@example.com>"
+    },
+    "deb": { "depends": ["python3"] }
+  }
+}
