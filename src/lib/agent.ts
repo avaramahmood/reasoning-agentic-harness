@@ -17,7 +17,8 @@ import { cleanModelOutput } from "./search";
 import {
   SYS_KNOWLEDGE,
   SYS_REACT,
-  SYS_REACT_THINKING,
+  SYS_CODE_ONLY,
+  SYS_REASON,
   SYS_CHAT,
   knowledgeUser,
   chatUser,
@@ -336,6 +337,83 @@ async function reactSolve(
   return { full: lastFull, answer, usedTool, grounded, verified: verified.join("\n") };
 }
 
+// THINKING mode, code branch: the router decided this needs computation, so go
+// STRAIGHT to code — no in-head reasoning (that's what produced the wrong "1"/"120"
+// direct answers and the pre-code spew). The MODEL writes the Python (this is the
+// showcase); buildFallbackCode is only a deterministic SAFETY NET when the model
+// emits no usable code or its code errors. Execute → answer is the output.
+async function codeSolve(
+  problem: string,
+  ctx: string,
+  history: ChatMessage[],
+  ev: PipelineEvents,
+  signal: AbortSignal,
+  tag: string
+): Promise<SolveOut> {
+  const rid = `${tag}code-0`;
+  ev.onStep({ id: rid, kind: "solve", title: "Write code", blurb: "Needs computation · writing Python", accent: ACCENT.solve });
+
+  // 1. The model writes the code.
+  const full = await streamChat(
+    [{ role: "system", content: SYS_CODE_ONLY + contextSystem(ctx) }, ...history, { role: "user", content: reactUser(problem) }],
+    { maxTokens: 320, temperature: 0.2, signal, stop: REACT_STOPS, frequencyPenalty: 0.5, presencePenalty: 0.3, onToken: (_d, f) => ev.onToken(rid, f) }
+  );
+  let code = extractCode(full);
+  const modelWroteCode = !!code;
+  // 2. Safety net only if the model produced nothing usable.
+  if (!code) code = buildFallbackCode(problem);
+  ev.onResult(rid, { text: full, code: code ?? undefined });
+
+  if (code && !signal.aborted) {
+    const eid = `${tag}exec-0`;
+    ev.onStep({ id: eid, kind: "exec", title: "Execute", blurb: "Run code — ground truth", accent: ACCENT.exec });
+    const res = await execCode(code);
+    const out = res.ok ? res.stdout.trim() || "(no output)" : `error: ${res.stderr || (res.timedOut ? "timed out" : "failed")}`;
+    ev.onResult(eid, { code, output: out, ok: res.ok });
+    if (res.ok) {
+      const answer = lastLine(out);
+      return { full, answer, usedTool: true, grounded: true, verified: answer };
+    }
+    // The model's code errored → try the deterministic net before giving up.
+    if (modelWroteCode && !signal.aborted) {
+      const fb = buildFallbackCode(problem);
+      if (fb) {
+        const eid2 = `${tag}exec-1`;
+        ev.onStep({ id: eid2, kind: "exec", title: "Execute", blurb: "Retry — verified code", accent: ACCENT.exec });
+        const res2 = await execCode(fb);
+        const out2 = res2.ok ? res2.stdout.trim() || "(no output)" : `error: ${res2.stderr || "failed"}`;
+        ev.onResult(eid2, { code: fb, output: out2, ok: res2.ok });
+        if (res2.ok) {
+          const answer = lastLine(out2);
+          return { full, answer, usedTool: true, grounded: true, verified: answer };
+        }
+      }
+    }
+  }
+  // no usable code, or every execution errored → fall back to plain reasoning.
+  return reasonSolve(problem, ctx, history, ev, signal, tag);
+}
+
+// THINKING mode, reason branch: no computation needed — reason, then answer.
+async function reasonSolve(
+  problem: string,
+  ctx: string,
+  history: ChatMessage[],
+  ev: PipelineEvents,
+  signal: AbortSignal,
+  tag: string
+): Promise<SolveOut> {
+  const rid = `${tag}reason-0`;
+  ev.onStep({ id: rid, kind: "solve", title: "Reasoning", blurb: "Chain-of-thought", accent: ACCENT.solve });
+  const full = await streamChat(
+    [{ role: "system", content: SYS_REASON + contextSystem(ctx) }, ...history, { role: "user", content: reactUser(problem) }],
+    { maxTokens: 640, temperature: 0.3, signal, stop: REACT_STOPS, frequencyPenalty: 0.5, presencePenalty: 0.3, onToken: (_d, f) => ev.onToken(rid, f) }
+  );
+  const answer = finalizeAnswer(full);
+  ev.onResult(rid, { text: full, answer });
+  return { full, answer, usedTool: false, grounded: false, verified: "" };
+}
+
 // Plain chat / codegen — chain-of-thought, NEVER auto-executes code.
 async function plainGenerate(
   problem: string,
@@ -446,29 +524,23 @@ export async function runAgent(
   }
 
   // ---- THINKING ----
-  // Full reasoning + code ReAct loop: the model detects occurrence/enumeration/
-  // arithmetic/string/date sub-tasks and offloads them to Python. The thinking-only
-  // SYS_REACT_THINKING addon is appended here (never to knowledge/reasoning) to make
-  // the model reach for code more reliably.
+  // Classify the question FIRST, then commit to one path:
+  //   needs computation  -> write code DIRECTLY (no in-head reasoning, which is
+  //                         where it wrongly answered "1"/"120" or spewed), run it,
+  //                         and the executed output IS the answer.
+  //   no computation      -> reason step by step, then answer.
   if (mode === "thinking") {
-    const r = await reactSolve(problem, ctx, skillAddon + SYS_REACT_THINKING, history, ev, signal, "", false);
+    const r = detectMechanical(problem)
+      ? await codeSolve(problem, ctx, history, ev, signal, "")
+      : await reasonSolve(problem, ctx, history, ev, signal, "");
     return { finalAnswer: r.answer, usedTool: r.usedTool, toolGrounded: r.grounded };
   }
 
   // ---- REASONING (full pipeline) ----
-  // Fast path: a pure "about me" lookup whose answer is already in memory is
-  // returned DETERMINISTICALLY — the LLM adds nothing but spelling drift and
-  // confabulation on these, so we skip the dice-roll entirely.
-  if (useMemory && isIdentityLookup(problem)) {
-    const memAns = answerFromMemory(problem, ctx);
-    if (memAns) {
-      const id = "answer";
-      ev.onStep({ id, kind: "answer", title: "Answer", blurb: "Direct from memory", accent: ACCENT.answer });
-      ev.onResult(id, { text: memAns, answer: memAns, note: "answered from saved memory (no model call)" });
-      const traceId = (await logTrace({ mode: "reasoning", problem, cot: "(answered deterministically from memory)", answer: memAns, reward: null })) ?? undefined;
-      return { finalAnswer: memAns, usedTool: false, toolGrounded: true, traceId };
-    }
-  }
+  // The MODEL recalls and answers from the injected OKF memory — that's the
+  // showcase. The deterministic answerFromMemory() is NOT a fast-path shortcut
+  // here; it's kept only as a SAFETY NET further down (the `if (bad)` guarantee),
+  // used when the model degenerates into a non-answer. Regex second, model first.
 
   // Only genuine computations (counting/arithmetic/string ops) go down the
   // tool-executing ReAct path. Codegen ("write a script…"), statements, and

@@ -74,6 +74,29 @@ export const SYS_REACT_THINKING =
   "wait for the TOOL OUTPUT before giving <answer>. Do the computation in code, not " +
   "in your head. Only answer directly when the question genuinely needs no such step.";
 
+// Thinking mode, CODE branch: the router already decided this needs computation,
+// so the model must NOT reason in prose or state an answer itself (that's where it
+// gets "1" for the r's in strawberry, or "120" for LEVEL) — it emits code ONLY.
+export const SYS_CODE_ONLY =
+  "This problem requires exact computation — counting/occurrences, enumeration, " +
+  "arithmetic, sorting, or string/date work — which you are UNRELIABLE at doing in " +
+  "your head. Do NOT reason in prose and do NOT write an answer yourself. Output " +
+  "EXACTLY ONE Python code block that computes and prints ONLY the final answer, " +
+  "then STOP:\n```python\n# compute and print only the final result\n```\n" +
+  "Examples:\n" +
+  "Problem: How many times does the letter r appear in strawberry?\n" +
+  '```python\nprint("strawberry".count("r"))\n```\n' +
+  "Problem: How many unique arrangements of the letters in LEVEL are there?\n" +
+  "```python\nfrom itertools import permutations\nprint(len(set(permutations(\"LEVEL\"))))\n```\n" +
+  "Problem: What is 50 plus three times 50?\n" +
+  "```python\nprint(50 + 3 * 50)\n```";
+
+// Thinking mode, REASON branch: no computation needed — reason it out, then answer.
+export const SYS_REASON =
+  "Think step by step inside <think> and </think>, then give the final answer " +
+  "inside <answer> and </answer>. Be careful and correct. Answer only the current " +
+  "question, then STOP." + NO_WEB;
+
 // Plain chat / codegen: think then answer, NEVER auto-run code.
 export const SYS_CHAT =
   "You are a helpful, knowledgeable on-device assistant. Keep your reasoning in " +
@@ -210,10 +233,23 @@ export function finalizeAnswer(full: string): string {
 
 // pull the first python code block (``` fences) or <code>…</code>
 export function extractCode(text: string): string | null {
+  // properly closed ```python … ```
   const fence = text.match(/```(?:python|py)?\s*\n([\s\S]*?)```/i);
   if (fence) return fence[1].trim();
   const tag = text.match(/<code>([\s\S]*?)<\/code>/i);
   if (tag) return tag[1].trim();
+  // Unterminated / MANGLED closing fence: the quantized 7B sometimes degenerates
+  // right at the end and emits "``㎟" + foreign script instead of a clean ```, so
+  // the regex above misses otherwise-valid code. Take from the opening fence and
+  // cut at the first broken-fence line or non-ASCII degeneration tail.
+  const open = text.match(/```(?:python|py)?\s*\n([\s\S]*)$/i);
+  if (open) {
+    let code = open[1]
+      .replace(/\n[ \t]*`+[\s\S]*$/, "") // a later line starting with backtick remnants → drop to end
+      .replace(/[^\x09\x0A\x0D\x20-\x7E][\s\S]*$/, "") // first non-ASCII char → drop the degenerate tail
+      .trim();
+    if (code) return code;
+  }
   return null;
 }
 
@@ -257,6 +293,18 @@ export function buildFallbackCode(problem: string): string | null {
     const letter = letterMatch[1].toLowerCase().replace(/[^a-z]/g, "");
     const word = letterMatch[2].toLowerCase().replace(/[^a-z-]/g, "");
     if (letter && word) return `print("${word}".count("${letter}"))`;
+  }
+
+  // (c) distinct arrangements / permutations / anagrams of the letters of a word
+  //     (LEVEL -> 30). The model is unreliable here (answers 60/120/10), so make
+  //     it deterministic: len(set(permutations(word))).
+  if (/\b(?:arrangements?|permutations?|anagrams?|orderings?|rearrangements?)\b/i.test(problem)) {
+    const quoted = problem.match(/["'“”‘’]([A-Za-z]{2,})["'“”‘’]/);
+    const wordKw = problem.match(/\bword\s+["'“”‘’]?([A-Za-z]{2,})["'“”‘’]?/i);
+    const lettersOf = problem.match(/\bletters\s+(?:in|of)\s+(?:the\s+word\s+)?["'“”‘’]?([A-Za-z]{2,})["'“”‘’]?/i);
+    const allCaps = problem.match(/\b([A-Z]{2,})\b/);
+    const w = (quoted && quoted[1]) || (wordKw && wordKw[1]) || (lettersOf && lettersOf[1]) || (allCaps && allCaps[1]);
+    if (w) return `from itertools import permutations\nprint(len(set(permutations("${w.toUpperCase()}"))))`;
   }
 
   // (b) a self-contained arithmetic expression (digit op digit, possibly chained)

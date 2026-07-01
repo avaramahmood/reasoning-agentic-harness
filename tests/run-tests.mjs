@@ -131,7 +131,7 @@ test("cleanModelOutput cuts a self-generated follow-up question (over-generation
 
 // ---- answer finalizer (think-vs-answer + degeneration cleanup) ----
 await build({ entryPoints: [path.join(ROOT, "src/lib/prompts.ts")], bundle: true, format: "esm", outfile: path.join(tmp, "prompts.mjs"), logLevel: "error" });
-const { finalizeAnswer, isNonAnswer } = await import("file://" + path.join(tmp, "prompts.mjs"));
+const { finalizeAnswer, isNonAnswer, extractCode, buildFallbackCode, detectMechanical } = await import("file://" + path.join(tmp, "prompts.mjs"));
 console.log("\nanswer finalizer");
 test("uses clean <answer> when good", () =>
   assert.equal(finalizeAnswer("<think>reasoning</think><answer>The capital is Paris.</answer>"), "The capital is Paris."));
@@ -146,6 +146,23 @@ test("Bengaluru case: cuts foreign + URL spam, keeps the real answer", () => {
 test("strips think/answer tags from the result", () => {
   assert.ok(!/<\/?(think|answer)>/.test(finalizeAnswer("<think>x</think><answer>hello world this is fine</answer>")));
 });
+test("extractCode: clean fenced block", () =>
+  assert.equal(extractCode('```python\nprint("hi")\n```'), 'print("hi")'));
+test("extractCode: MANGLED closing fence (degeneration ate the ```)", () => {
+  const mangled = '```python\nfrom itertools import permutations\nprint(len(set(permutations("LEVEL"))))\n``㎟\nגודל: 100';
+  assert.equal(extractCode(mangled), 'from itertools import permutations\nprint(len(set(permutations("LEVEL"))))');
+});
+test("extractCode: no code -> null", () => assert.equal(extractCode("just prose, no code here"), null));
+test("buildFallbackCode: LEVEL arrangements -> deterministic permutation code", () => {
+  const code = buildFallbackCode('Look closely at the word "LEVEL". How many unique, distinct 5-letter arrangements can you make?');
+  assert.ok(/permutations\("LEVEL"\)/.test(code) && /len\(set\(/.test(code), `got: ${code}`);
+});
+test("buildFallbackCode: 'anagrams of the letters in cheese'", () => {
+  const code = buildFallbackCode("How many anagrams of the letters in cheese are there?");
+  assert.ok(/permutations\("CHEESE"\)/.test(code), `got: ${code}`);
+});
+test("detectMechanical routes arrangements to code", () =>
+  assert.ok(detectMechanical('How many distinct arrangements of the word "LEVEL" are there?')));
 test("isNonAnswer flags persona-echo and empties, not real answers", () => {
   assert.ok(isNonAnswer("You are a helpful assistant who provides information."));
   assert.ok(isNonAnswer("As an AI language model, I cannot..."));
