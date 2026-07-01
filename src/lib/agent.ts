@@ -17,6 +17,7 @@ import { cleanModelOutput } from "./search";
 import {
   SYS_KNOWLEDGE,
   SYS_REACT,
+  SYS_REACT_THINKING,
   SYS_CHAT,
   knowledgeUser,
   chatUser,
@@ -408,7 +409,13 @@ export async function runAgent(
   opts: RunOpts = {}
 ): Promise<PipelineResult> {
   const { useMemory = true, docContext = "", skillAddon = "", history = [] } = opts;
-  const ctx = useMemory ? await recallContext(problem, ev, signal, docContext) : docContext;
+  // OKF memory recall is only for the full Reasoning pipeline — knowledge/thinking
+  // don't need it and injecting the profile just pollutes their context. They still
+  // get any explicitly attached-document context.
+  const ctx =
+    useMemory && mode === "reasoning"
+      ? await recallContext(problem, ev, signal, docContext)
+      : docContext;
 
   // ---- KNOWLEDGE ----
   if (mode === "knowledge") {
@@ -420,7 +427,18 @@ export async function runAgent(
         ...history,
         { role: "user", content: knowledgeUser(problem) },
       ],
-      { maxTokens: 420, temperature: 0.3, signal, onToken: (_d, f) => ev.onToken(id, f) }
+      // same anti-degeneration guards as thinking/reasoning: hard stops (incl.
+      // "\nQuestion:"/"\nUser:") + freq/presence penalties so the quantized 7B
+      // can't spew repeated tokens or roll into a self-generated Q&A list.
+      {
+        maxTokens: 420,
+        temperature: 0.3,
+        signal,
+        stop: REACT_STOPS,
+        frequencyPenalty: 0.5,
+        presencePenalty: 0.3,
+        onToken: (_d, f) => ev.onToken(id, f),
+      }
     );
     const answer = finalizeAnswer(full);
     ev.onResult(id, { text: full, answer });
@@ -428,8 +446,12 @@ export async function runAgent(
   }
 
   // ---- THINKING ----
+  // Full reasoning + code ReAct loop: the model detects occurrence/enumeration/
+  // arithmetic/string/date sub-tasks and offloads them to Python. The thinking-only
+  // SYS_REACT_THINKING addon is appended here (never to knowledge/reasoning) to make
+  // the model reach for code more reliably.
   if (mode === "thinking") {
-    const r = await reactSolve(problem, ctx, skillAddon, history, ev, signal, "", false);
+    const r = await reactSolve(problem, ctx, skillAddon + SYS_REACT_THINKING, history, ev, signal, "", false);
     return { finalAnswer: r.answer, usedTool: r.usedTool, toolGrounded: r.grounded };
   }
 

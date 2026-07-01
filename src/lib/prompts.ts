@@ -60,6 +60,20 @@ export const SYS_REACT =
   "<answer>2</answer>" +
   NO_WEB;
 
+// Thinking-mode ONLY addendum (appended to SYS_REACT for the `thinking` mode, so
+// it never touches knowledge or reasoning). Pushes the model to actively route
+// occurrence-counting / enumeration / arithmetic / date / string work through the
+// Python tool instead of doing it in its head — the ReAct pipeline is only as good
+// as the model's willingness to reach for code, and this makes it reach more.
+export const SYS_REACT_THINKING =
+  "\n\nThis is TOOL-USE mode. Before you answer, first decide whether the problem " +
+  "involves any of: counting or occurrences (how many X, frequency), enumeration or " +
+  "listing/filtering items, arithmetic or numeric comparison, dates or day/month " +
+  "logic, sorting, or string manipulation. If it involves ANY of these, you MUST " +
+  "solve that part with Python — write ONE code block that prints the result and " +
+  "wait for the TOOL OUTPUT before giving <answer>. Do the computation in code, not " +
+  "in your head. Only answer directly when the question genuinely needs no such step.";
+
 // Plain chat / codegen: think then answer, NEVER auto-run code.
 export const SYS_CHAT =
   "You are a helpful, knowledgeable on-device assistant. Keep your reasoning in " +

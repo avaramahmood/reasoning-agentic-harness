@@ -88,23 +88,11 @@ function MemoryBody({ hits, status }: { hits?: OkfHit[]; status: StepStatus }) {
     return <div className="mt-4 text-sm text-muted-foreground caret">searching local store…</div>;
   if (!hits || !hits.length)
     return <div className="mt-4 text-sm text-muted-foreground">No relevant facts found in the store.</div>;
+  // Keep this compact: just confirm recall happened and how much was grounded —
+  // listing every concept + snippet floods the transcript.
   return (
-    <div className="mt-4 space-y-2">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-        Retrieved {hits.length} concept{hits.length > 1 ? "s" : ""} (grounded into the prompt)
-      </div>
-      {hits.map((h) => (
-        <div key={h.id} className="rounded-md bg-muted px-4 py-3 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold">{h.title}</span>
-            <span className="rounded bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground">
-              {h.type}
-            </span>
-            <span className="ml-auto font-mono text-[11px] text-muted-foreground">{h.id}</span>
-          </div>
-          {h.snippet && <div className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{h.snippet}</div>}
-        </div>
-      ))}
+    <div className="mt-4 text-sm text-muted-foreground">
+      Grounded {hits.length} relevant fact{hits.length > 1 ? "s" : ""} from local memory into the prompt.
     </div>
   );
 }
