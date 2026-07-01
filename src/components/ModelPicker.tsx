@@ -65,7 +65,7 @@ export default function ModelPicker({ onReadyChange }: Props) {
   return (
     <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Model</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Model</div>
         <ModelState status={status} controlOffline={controlOffline} activeName={activeName} />
       </div>
 
@@ -96,7 +96,7 @@ export default function ModelPicker({ onReadyChange }: Props) {
             <button
               onClick={load}
               disabled={loading || (!picked && !customPath.trim())}
-              className="shrink-0 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+              className="shrink-0 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40"
             >
               {loading ? "Loading…" : "Load"}
             </button>
@@ -149,7 +149,7 @@ function ModelState({
     label = "error";
   }
   return (
-    <span className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${cls}`}>
+    <span className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${cls}`}>
       <span className={"h-1.5 w-1.5 rounded-full bg-current " + (pulse ? "animate-blink" : "")} />
       {label}
     </span>

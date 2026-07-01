@@ -62,6 +62,92 @@ export async function execCode(code: string): Promise<ExecResult> {
   return r.json();
 }
 
+// ---- auxiliary service: the reward-gate GGUF (bge-reranker, --reranking) ----
+export interface AuxOne {
+  ready: boolean;
+  loading: boolean;
+  error: string | null;
+  missing: boolean;
+  file: string; // GGUF filename under models/
+  port: number;
+}
+export interface AuxStatus {
+  reward: AuxOne;
+}
+
+export async function ensureAux(): Promise<AuxStatus> {
+  const r = await fetch(`${API}/api/aux/ensure`, { method: "POST" });
+  if (!r.ok) throw new Error(`aux ensure ${r.status}`);
+  return r.json();
+}
+
+export async function getAux(): Promise<AuxStatus> {
+  const r = await fetch(`${API}/api/aux/status`);
+  if (!r.ok) throw new Error(`aux status ${r.status}`);
+  return r.json();
+}
+
+// ---- preference-trace store (LoRA training data) ----
+export type TraceLabel = "positive" | "negative" | "unlabeled";
+export type Feedback = "up" | "down" | null;
+
+export interface TraceEntry {
+  id: string;
+  ts: string;
+  mode: string;
+  problem: string;
+  cot: string;
+  answer: string;
+  reward: number | null;
+  feedback: Feedback;
+  label: TraceLabel;
+}
+
+// log a (prompt, CoT, answer) example; returns its id so feedback can attach later
+export async function logTrace(entry: {
+  mode: string;
+  problem: string;
+  cot: string;
+  answer: string;
+  reward: number | null;
+}): Promise<string | null> {
+  try {
+    const r = await fetch(`${API}/api/traces/log`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entry),
+    });
+    return r.ok ? (await r.json()).id ?? null : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function traceFeedback(id: string, feedback: Feedback): Promise<void> {
+  try {
+    await fetch(`${API}/api/traces/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, feedback }),
+    });
+  } catch {
+    /* best-effort */
+  }
+}
+
+export async function listTraces(): Promise<TraceEntry[]> {
+  try {
+    const r = await fetch(`${API}/api/traces/list`);
+    return r.ok ? (await r.json()).traces ?? [] : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function clearTraces(): Promise<void> {
+  await fetch(`${API}/api/traces/clear`, { method: "POST" });
+}
+
 // true if the control server itself is up (vs. not started yet)
 export async function controlUp(): Promise<boolean> {
   try {

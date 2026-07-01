@@ -1,5 +1,7 @@
+import { Terminal, Check } from "lucide-react";
 import { StepView } from "../lib/agent";
 import { extractThink, extractAnswer } from "../lib/prompts";
+import { OkfHit } from "../lib/okf";
 import MathText from "./MathText";
 
 export type StepStatus = "running" | "done";
@@ -11,6 +13,9 @@ export interface StepState {
   code?: string;
   output?: string;
   ok?: boolean;
+  hits?: OkfHit[];
+  score?: number;
+  note?: string;
 }
 
 export default function StepCard({
@@ -27,23 +32,79 @@ export default function StepCard({
     <div className="animate-rise rounded-lg border border-border bg-card p-5 shadow-sm">
       <div className="flex items-center gap-3">
         <div
-          className="grid h-9 w-9 place-items-center rounded-full text-sm font-bold text-white"
-          style={{ background: accent, boxShadow: `0 4px 14px ${accent}55` }}
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-[13px] font-bold text-white"
+          style={{ background: accent, boxShadow: `0 2px 8px ${accent}40` }}
         >
-          {view.kind === "exec" ? "▷" : index + 1}
+          {view.kind === "exec" ? <Terminal className="h-4 w-4" strokeWidth={2.25} /> : index + 1}
         </div>
         <div className="flex-1">
-          <div className="font-semibold leading-tight">{view.title}</div>
-          <div className="text-xs text-muted-foreground">{view.blurb}</div>
+          <div className="text-[15px] font-semibold leading-tight tracking-tight">{view.title}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">{view.blurb}</div>
         </div>
         <Pill status={state.status} ok={state.ok} kind={view.kind} />
       </div>
 
       {view.kind === "exec" ? (
         <ExecBody code={state.code} output={state.output} ok={state.ok} status={state.status} />
+      ) : view.kind === "memory" ? (
+        <MemoryBody hits={state.hits} status={state.status} />
+      ) : view.kind === "gate" ? (
+        <GateBody score={state.score} ok={state.ok} note={state.note} status={state.status} />
       ) : (
         <ModelBody text={state.text ?? ""} status={state.status} />
       )}
+    </div>
+  );
+}
+
+function GateBody({ score, ok, note, status }: { score?: number; ok?: boolean; note?: string; status: StepStatus }) {
+  if (status === "running") return <div className="mt-4 text-sm text-muted-foreground caret">scoring…</div>;
+  if (score === undefined)
+    return <div className="mt-4 text-sm text-muted-foreground">{note || "Gate skipped (reward model unavailable)."}</div>;
+  const pct = Math.round(score * 100);
+  const color = ok ? "#10b981" : "#ef4444";
+  return (
+    <div className="mt-4">
+      <div className="mb-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <span>reward score</span>
+        <span className="inline-flex items-center gap-1" style={{ color }}>
+          {ok && <Check className="h-3 w-3" strokeWidth={3} />}
+          {ok ? "released" : "below threshold"}
+        </span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <div className="mt-1 text-sm font-semibold" style={{ color }}>
+        {pct}/100
+      </div>
+      {note && <div className="mt-0.5 text-[11px] text-muted-foreground">{note}</div>}
+    </div>
+  );
+}
+
+function MemoryBody({ hits, status }: { hits?: OkfHit[]; status: StepStatus }) {
+  if (status === "running")
+    return <div className="mt-4 text-sm text-muted-foreground caret">searching local store…</div>;
+  if (!hits || !hits.length)
+    return <div className="mt-4 text-sm text-muted-foreground">No relevant facts found in the store.</div>;
+  return (
+    <div className="mt-4 space-y-2">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        Retrieved {hits.length} concept{hits.length > 1 ? "s" : ""} (grounded into the prompt)
+      </div>
+      {hits.map((h) => (
+        <div key={h.id} className="rounded-md bg-muted px-4 py-3 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">{h.title}</span>
+            <span className="rounded bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground">
+              {h.type}
+            </span>
+            <span className="ml-auto font-mono text-[11px] text-muted-foreground">{h.id}</span>
+          </div>
+          {h.snippet && <div className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{h.snippet}</div>}
+        </div>
+      ))}
     </div>
   );
 }
@@ -63,7 +124,7 @@ function ModelBody({ text, status }: { text: string; status: StepStatus }) {
     <>
       {(body || status === "running") && (
         <div className="mt-4">
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             {hasCode ? "Reasoning + code" : "Reasoning"}
           </div>
           <div
@@ -78,7 +139,7 @@ function ModelBody({ text, status }: { text: string; status: StepStatus }) {
       )}
       {showAnswer && (
         <div className="mt-3">
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             Answer
           </div>
           <div className="whitespace-pre-wrap rounded-md bg-accent px-4 py-3 text-sm font-medium text-accent-foreground">
@@ -104,7 +165,7 @@ function ExecBody({
   return (
     <div className="mt-4 space-y-3">
       <div>
-        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Python
         </div>
         <pre className="overflow-x-auto rounded-md bg-[#0d1117] px-4 py-3 font-mono text-[13px] leading-relaxed text-[#e6edf3]">
@@ -112,10 +173,13 @@ function ExecBody({
         </pre>
       </div>
       <div>
-        <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           stdout
           {status === "done" && (
-            <span className={ok ? "text-primary" : "text-destructive"}>{ok ? "exit 0 ✓" : "failed"}</span>
+            <span className={"inline-flex items-center gap-1 " + (ok ? "text-primary" : "text-destructive")}>
+              {ok && <Check className="h-3 w-3" strokeWidth={3} />}
+              {ok ? "exit 0" : "failed"}
+            </span>
           )}
         </div>
         <pre
@@ -135,16 +199,22 @@ function ExecBody({
 function Pill({ status, ok, kind }: { status: StepStatus; ok?: boolean; kind: string }) {
   if (status === "running")
     return (
-      <span className="flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground">
+      <span className="flex items-center gap-1.5 rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground">
         <span className="h-1.5 w-1.5 animate-blink rounded-full bg-current" />
-        {kind === "exec" ? "running" : "thinking"}
+        {kind === "exec"
+          ? "running"
+          : kind === "memory"
+          ? "searching"
+          : kind === "gate"
+          ? "scoring"
+          : "thinking"}
       </span>
     );
   const good = kind !== "exec" || ok;
   return (
     <span
       className={
-        "rounded-full px-2.5 py-1 text-xs font-medium " +
+        "rounded-md px-2.5 py-1 text-xs font-medium " +
         (good ? "bg-accent text-accent-foreground" : "bg-destructive/10 text-destructive")
       }
     >

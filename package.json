@@ -12,12 +12,15 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "control": "node server/control.mjs",
+    "test": "node tests/run-tests.mjs",
     "server": "bash scripts/run-llama-server.sh",
     "electron": "electron .",
     "dist": "npm run build && electron-builder --linux"
   },
   "dependencies": {
     "katex": "^0.16.11",
+    "lucide-react": "^1.22.0",
+    "pdfjs-dist": "^4.10.38",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -36,17 +39,36 @@
   "build": {
     "appId": "com.reasoningagent.app",
     "productName": "Reasoning Agent",
-    "directories": { "output": "release" },
-    "files": ["dist/**", "electron/**", "package.json"],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ],
     "extraResources": [
-      { "from": "server", "to": "server" },
-      { "from": "native/linux", "to": "native/linux" }
+      {
+        "from": "server",
+        "to": "server"
+      },
+      {
+        "from": "native/linux",
+        "to": "native/linux"
+      }
     ],
     "linux": {
-      "target": ["deb", "AppImage"],
+      "target": [
+        "deb",
+        "AppImage"
+      ],
       "category": "Utility",
       "maintainer": "Your Team <your-email@example.com>"
     },
-    "deb": { "depends": ["python3"] }
+    "deb": {
+      "depends": [
+        "python3"
+      ]
+    }
   }
 }

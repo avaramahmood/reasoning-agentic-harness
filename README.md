@@ -6,7 +6,12 @@ with **three modes** so easy questions stay fast:
 | Mode | Pipeline | For |
 |---|---|---|
 | **Knowledge** | 1 model pass | facts / recall — fast, no tools |
-| **Thinking** | Planner → Solver → Execute → Verifier | math, puzzles, counting — tool-grounded |
+| **Thinking** | Reason ⇄ run code (ReAct loop) | math, puzzles, counting — tool-grounded |
+| **Reasoning** | CoT + memory + docs + skills + reward-gate | the full chatbot (see below) |
+
+All modes first **Recall** from a local OKF knowledge store (markdown + YAML on
+disk) and inject matched facts as ground truth — episodic memory the model reads,
+never hallucinates. Toggle/edit it in the **Memory** panel.
 
 The **Execute** stage is a real Python tool, not another model pass. A
 **deterministic router** forces counting/arithmetic down the code path (with a
@@ -15,6 +20,45 @@ regex fallback that writes the code itself), so mechanical questions are correct
 **skipped** — faster, and no redundant re-statements.
 
 Loads `.gguf` files directly (pick from the folder or paste any path).
+
+### Reasoning mode — the full CoT chatbot (single 7B, no planner)
+
+A chain-of-thought chat over one on-device 7B, grounded in your local data and
+reward-gated. No second model for planning — the 7B reasons directly and writes
+Python whenever a step is verifiable.
+
+```
+Recall (OKF facts + attached docs) → [active skill] → 7B chain-of-thought
+   → Execute verifiable steps as Python (ground truth)
+   → Reward gate (bge-reranker GGUF) — score < 0.45 → resample once, keep best
+   → log a preference trace (👍/👎) for later LoRA training
+```
+
+Everything Reasoning mode includes:
+
+- **Local memory (OKF)** — durable user facts in `okf-store/*.md`; recalled and
+  injected as ground truth, and **auto-captured** by the 7B (task content is
+  filtered out). See [docs](docs/) and the Memory panel.
+- **Document attachment (RAG)** — attach `.pdf` / text files in the composer;
+  parsed + chunked + keyword-retrieved client-side (fully local, no embedding
+  server), injected into context.
+- **Skills** — user-authored markdown behaviour modifiers (`skills/*.md`) chosen
+  in the composer; injected into the system prompt.
+- **Reward gate** — a `bge-reranker` cross-encoder (GGUF, fine-tuned on your PEAR
+  traces) scores the chain-of-thought; low scores resample once. CPU
+  `llama-server --reranking` on `:8084`. **[docs/REWARD_GATE.md](docs/REWARD_GATE.md)**
+- **Preference traces** — every answer is logged `(prompt, CoT, answer, reward)`
+  to `data/traces.jsonl`; 👍/👎 sets the positive/negative label for LoRA.
+  **[docs/TRACE_STORE.md](docs/TRACE_STORE.md)**
+
+Each piece degrades gracefully: no reward GGUF → gate skipped; no docs → plain
+chat; no skill → default behaviour.
+
+**Setup:** train the reward gate → `models/reward-gate.gguf`
+(**[docs/REWARD_GATE.md](docs/REWARD_GATE.md)**). It's optional; Reasoning mode
+works without it. Test scripts to exercise everything:
+**[docs/TEST_QUESTIONS.md](docs/TEST_QUESTIONS.md)**. Run `npm test` for the
+unit + integration + load suite.
 
 ### Why this design (the research)
 

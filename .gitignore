@@ -2,7 +2,7 @@
 node_modules/
 .pnp
 .pnp.js
-
+.claude/
 # ---- build output ----
 dist/
 dist-ssr/
@@ -15,6 +15,12 @@ native/
 # the GGUF model is multi-GB — published on Hugging Face, not committed
 models/*
 !models/.gitkeep
+
+# ---- user's private local knowledge store (OKF markdown files) ----
+okf-store/
+
+# ---- preference-trace store (LoRA training data) ----
+data/
 
 # ---- logs ----
 *.log

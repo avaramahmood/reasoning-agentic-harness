@@ -14,11 +14,20 @@
 // Prompts use the model's trained <think>/<answer> format so the SFT/GRPO model
 // stays in-distribution.
 
+import { cleanModelOutput } from "./search";
+
+// You run fully offline. There is NO web/search tool — say so, never invent one.
+const NO_WEB =
+  " You have NO internet access and NO web search. Never output URLs, search " +
+  "results, or HTTP/'xmlhttp' calls — if a question needs live web data, say you " +
+  "cannot access the web. Answer in ONE response and then stop; never continue " +
+  "with extra 'Question:'/'Answer:' pairs of your own.";
+
 export const SYS_KNOWLEDGE =
   "You are answering a knowledge or commonsense question. Give the correct, " +
   "concise answer directly — do not over-think simple questions. Reason briefly " +
   "inside <think> and </think> only if needed, then put the final answer inside " +
-  "<answer> and </answer>.";
+  "<answer> and </answer>." + NO_WEB;
 
 export function knowledgeUser(problem: string): string {
   return `Question: ${problem}`;
@@ -48,7 +57,23 @@ export const SYS_REACT =
   '```python\ndays = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]\n' +
   'print(len([d for d in days if d.startswith("T")]))\n```\n' +
   "TOOL OUTPUT: 2\n" +
-  "<answer>2</answer>";
+  "<answer>2</answer>" +
+  NO_WEB;
+
+// Plain chat / codegen: think then answer, NEVER auto-run code.
+export const SYS_CHAT =
+  "You are a helpful, knowledgeable on-device assistant. Keep your reasoning in " +
+  "<think> and </think> BRIEF (a few sentences at most), then give a clear answer " +
+  "in <answer> and </answer>. When asked to WRITE or GENERATE code, put the " +
+  "COMPLETE code in the answer as a fenced ```code block — do NOT pretend to run " +
+  "it or invent its output. When the user simply tells you something about " +
+  "themselves, acknowledge it briefly. Answer the user's CURRENT question ONLY, " +
+  "then STOP — do not invent or answer extra questions of your own, and do not " +
+  "add more examples after a complete answer." + NO_WEB;
+
+export function chatUser(problem: string): string {
+  return problem;
+}
 
 export function reactUser(problem: string): string {
   return `Problem: ${problem}`;
@@ -116,6 +141,57 @@ export function extractThink(text: string): string {
   const open = text.match(/<think>([\s\S]*)$/i);
   if (open) return open[1].trim();
   return "";
+}
+
+// only the <answer> tag content ("" if there is no answer tag) — unlike
+// extractAnswer it does NOT fall back to the last line.
+function answerTagContent(text: string): string {
+  const m = text.match(/<answer>([\s\S]*?)<\/answer>/i);
+  if (m) return m[1].trim();
+  const open = text.match(/<answer>([\s\S]*)$/i);
+  if (open) return open[1].trim();
+  return "";
+}
+
+// A "non-answer": the model degenerated into echoing its own persona/role, went
+// empty, or refused — instead of answering. Used to trigger a resample even when
+// the reward gate is unavailable, so the pipeline stays self-correcting offline.
+export function isNonAnswer(text: string): boolean {
+  const t = (text || "").trim();
+  if (!t || t.length < 2 || /^\(no answer\)\.?$/i.test(t)) return true;
+  // model restating the assistant persona from the system prompt
+  if (/\b(?:helpful|knowledgeable|on-device)\s+assistant\b/i.test(t)) return true;
+  if (/^you are (?:a|an)\b[^.\n]*\bassistant\b/i.test(t)) return true;
+  if (/^as an? (?:ai|language model|assistant)\b/i.test(t)) return true;
+  if (/^i(?:'m| am) (?:just )?(?:a|an) (?:helpful )?(?:ai|language model|assistant)\b/i.test(t)) return true;
+  return false;
+}
+
+// a chunk that is mostly URLs / xmlhttp spam / too short to be a real answer
+function isMostlyJunk(s: string): boolean {
+  const t = s.trim();
+  if (t.length < 2) return true;
+  const real = t
+    .replace(/\b\S*https?:\/\/\S+/gi, "")
+    .replace(/\bxmlhttp\S*/gi, "")
+    .replace(/\bwww\.\S+/gi, "")
+    .trim();
+  return real.length < Math.min(15, Math.ceil(t.length * 0.5));
+}
+
+// Pick the best CLEAN answer. This quantized 7B often puts the real answer + code
+// in <think> and degenerates inside <answer>, so: prefer a clean <answer> tag,
+// else fall back to the <think> content, else the whole cleaned output. All
+// cleaned of spew/loops/foreign-script and stripped of tags.
+export function finalizeAnswer(full: string): string {
+  const strip = (s: string) =>
+    s.replace(/<\/?(think|answer)>/gi, " ").replace(/[^\x09\x0A\x0D\x20-\x7E]+$/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  const ans = cleanModelOutput(answerTagContent(full));
+  if (ans && !isMostlyJunk(ans)) return strip(ans);
+  const think = cleanModelOutput(extractThink(full));
+  if (think && !isMostlyJunk(think)) return strip(think);
+  const whole = cleanModelOutput(full.replace(/<\/?(think|answer)>/gi, " "));
+  return strip(whole) || "(no answer)";
 }
 
 // pull the first python code block (``` fences) or <code>…</code>
