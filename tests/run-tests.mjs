@@ -146,6 +146,12 @@ test("Bengaluru case: cuts foreign + URL spam, keeps the real answer", () => {
 test("strips think/answer tags from the result", () => {
   assert.ok(!/<\/?(think|answer)>/.test(finalizeAnswer("<think>x</think><answer>hello world this is fine</answer>")));
 });
+test("strict: uses clean <answer> when good", () =>
+  assert.equal(finalizeAnswer("<think>reasoning</think><answer>The capital is Paris.</answer>", true), "The capital is Paris."));
+test("strict: does not fall back to <think> when <answer> is missing", () =>
+  assert.equal(finalizeAnswer("<think>The roots are x=2 and x=3.</think>", true), ""));
+test("strict: does not fall back to whole when <answer> is missing", () =>
+  assert.equal(finalizeAnswer("Yes, Bengaluru is located in India.", true), ""));
 test("extractCode: clean fenced block", () =>
   assert.equal(extractCode('```python\nprint("hi")\n```'), 'print("hi")'));
 test("extractCode: MANGLED closing fence (degeneration ate the ```)", () => {

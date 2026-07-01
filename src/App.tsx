@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import PolygonBackground from "./components/RivaBg";
+import RivaLogo from "./components/RIVA.svg";
 import {
   ArrowUp,
   Square,
   Paperclip,
   Sparkles,
   SlidersHorizontal,
-  Sun,
-  Moon,
   Check,
   BadgeCheck,
   ThumbsUp,
@@ -47,7 +47,7 @@ export default function App() {
   const [running, setRunning] = useState(false);
   const [modelReady, setModelReady] = useState(false);
   const [error, setError] = useState("");
-  const [dark, setDark] = useState(false);
+  const [dark] = useState(true); // the palette is a dark theme — keep it on for readable, consistent colours
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [memoryOn, setMemoryOn] = useState(true);
@@ -62,7 +62,6 @@ export default function App() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => setDark(window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false), []);
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
@@ -73,7 +72,6 @@ export default function App() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [turns, active]);
 
-  // Reasoning mode needs the reward-gate service; ask the control server to spawn it.
   useEffect(() => {
     if (mode !== "reasoning") return;
     let live = true;
@@ -105,7 +103,7 @@ export default function App() {
   async function start(q?: string) {
     const text = (q ?? problem).trim();
     if (!text || running || !modelReady) return;
-    const prevQuestion = turns.length ? turns[turns.length - 1].question : undefined; // for "remember this"
+    const prevQuestion = turns.length ? turns[turns.length - 1].question : undefined;
     setProblem("");
     setError("");
     setRunning(true);
@@ -114,7 +112,6 @@ export default function App() {
     const sstate: Record<string, StepState> = {};
     setActive({ question: text, steps, sstate });
 
-    // build short history + grounding from attached docs
     const history: ChatMessage[] = turns.slice(-4).flatMap((t) => [
       { role: "user" as const, content: t.question },
       { role: "assistant" as const, content: t.answer },
@@ -193,190 +190,203 @@ export default function App() {
   const empty = turns.length === 0 && !active;
 
   return (
-    <div className="mx-auto flex min-h-full max-w-3xl flex-col px-5">
-      {/* header */}
-      <header className="sticky top-0 z-10 -mx-5 flex items-center gap-3 border-b border-border bg-background/80 px-5 py-3.5 backdrop-blur-xl">
-        <div className="grid h-9 w-9 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground shadow-sm">R</div>
-        <div className="flex-1">
-          <div className="text-[15px] font-semibold leading-none tracking-tight">Reasoning Agent</div>
-          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span className={"h-1.5 w-1.5 rounded-full " + (modelReady ? "bg-primary" : "bg-muted-foreground/40")} />
-            on-device · llama.cpp · {modelReady ? "online" : "offline"}
+    <PolygonBackground>
+      {/* Header wrapper (Navbar full width) */}
+      <header className="sticky top-0 z-10 w-full h-24 bg-background/95 backdrop-blur-md select-none border-b border-primary/10">
+        <div className="mx-auto max-w-3xl h-full px-5 relative flex items-center justify-center">
+          {/* Header Action Buttons */}
+          <div className="absolute left-5 top-7 flex items-center gap-2">
+            <button
+              onClick={() => setSettingsOpen((s) => !s)}
+              className={
+                "grid h-10 w-10 place-items-center rounded-xl border transition-all duration-200 " +
+                (settingsOpen
+                  ? "border-primary/50 bg-primary/10 text-primary"
+                  : "border-primary/20 bg-card/40 text-muted-foreground hover:text-foreground hover:border-primary/40")
+              }
+              title="System Configuration"
+            >
+              <SlidersHorizontal className="h-[18px] w-[18px]" strokeWidth={2} />
+            </button>
+          </div>
+
+          {/* Main Title replaced with the RIVA logo */}
+          <div className="pt-1">
+            <img src={RivaLogo} alt="RIVA" className="h-14 w-auto" />
+          </div>
+
+          {/* Engine Status Tracker Panel */}
+          <div className="absolute right-5 top-7 flex flex-col items-end text-right hidden sm:flex">
+            <div className="text-xs font-bold uppercase leading-none tracking-wider text-foreground/80">
+              Core Engine
+            </div>
+            <div className="mt-1.5 flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground">
+              <span className={`h-1.5 w-1.5 rounded-full ${modelReady ? "bg-primary shadow-[0_0_8px_rgba(45,212,191,0.6)]" : "bg-muted-foreground/40"}`} />
+              {modelReady ? "active" : "standby"}
+            </div>
           </div>
         </div>
-        <button
-          onClick={() => setSettingsOpen((s) => !s)}
-          className={
-            "grid h-9 w-9 place-items-center rounded-md border transition-colors " +
-            (settingsOpen ? "border-primary/40 bg-accent text-accent-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground")
-          }
-          title="Settings"
-        >
-          <SlidersHorizontal className="h-[17px] w-[17px]" strokeWidth={2} />
-        </button>
-        <button
-          onClick={() => setDark((d) => !d)}
-          className="grid h-9 w-9 place-items-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:text-foreground"
-          title="Toggle theme"
-        >
-          {dark ? <Sun className="h-[17px] w-[17px]" strokeWidth={2} /> : <Moon className="h-[17px] w-[17px]" strokeWidth={2} />}
-        </button>
       </header>
 
-      {/* settings drawer */}
-      {settingsOpen && (
-        <div className="mt-4 flex flex-col gap-3">
-          <ModelPicker onReadyChange={setModelReady} />
-          <MemoryPanel memoryOn={memoryOn} onToggle={setMemoryOn} refreshKey={memVersion} />
-          <SkillsPanel refreshKey={memVersion} onChange={() => setMemVersion((v) => v + 1)} />
-        </div>
-      )}
+      <div className="mx-auto flex min-h-[calc(100vh-6rem)] max-w-3xl flex-col px-5">
 
-      {/* conversation */}
-      <div className="flex flex-1 flex-col gap-6 py-6">
-        {empty && (
-          <div className="mx-auto mt-16 max-w-md text-center">
-            <div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-lg border border-border bg-card shadow-sm">
-              <Sparkles className="h-6 w-6 text-primary" strokeWidth={1.75} />
+        {/* Settings panel configuration overlay drawer */}
+
+        {settingsOpen && (
+
+          <div className="mt-1 mb-4 flex flex-col gap-3 rounded-3xl border border-primary/20 bg-card/90 p-5 shadow-[0_18px_80px_-50px_rgba(45,212,191,0.3)] backdrop-blur-2xl">
+            <div className="h-[50px] w-full bg-transparent" />
+            <ModelPicker onReadyChange={setModelReady} />
+            <MemoryPanel memoryOn={memoryOn} onToggle={setMemoryOn} refreshKey={memVersion} />
+            <SkillsPanel refreshKey={memVersion} onChange={() => setMemVersion((v) => v + 1)} />
+          </div>
+        )}
+
+        {/* Messaging conversation logs frame — subtext sits in the MIDDLE when empty */}
+        <div className={"flex flex-1 flex-col gap-6 py-4" + (empty ? " items-center justify-center" : "")}>
+          {empty && (
+            <div className="mx-auto max-w-md text-center">
+
+              <div className="text-2xl font-semibold tracking-tight">What should we reason about?</div>
+              <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
+                {modelReady ? "Chain-of-thought with tools and local memory, reward-gated. Attach a document or pick a skill to begin." : "Open Settings and load a model to begin."}
+              </p>
             </div>
-            <div className="text-2xl font-semibold tracking-tight">What should we reason about?</div>
-            <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
-              {modelReady ? "Chain-of-thought with tools and local memory, reward-gated. Attach a document or pick a skill to begin." : "Open Settings and load a model to begin."}
-            </p>
-          </div>
-        )}
+          )}
 
-        {turns.map((t) => (
-          <TurnView key={t.id} turn={t} onRate={(f) => rate(t.id, t.traceId, f)} />
-        ))}
-
-        {active && <ActiveTurn active={active} />}
-        {error && <p className="text-sm text-destructive">Error: {error}</p>}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* composer */}
-      <div className="sticky bottom-0 -mx-5 border-t border-border bg-background/85 px-5 pb-5 pt-3 backdrop-blur-xl">
-        {remembered && (
-          <div className="mb-2.5 inline-flex items-center gap-1.5 rounded-md border border-primary/25 bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground">
-            <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
-            Remembered {remembered} detail{remembered > 1 ? "s" : ""} to memory
-          </div>
-        )}
-        {/* tool row */}
-        <div className="mb-2.5 flex flex-wrap items-center gap-2 text-xs">
-          <div className="flex rounded-md border border-border bg-card p-0.5">
-            {MODES.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setMode(m.id)}
-                disabled={running}
-                className={
-                  "rounded-[5px] px-3 py-1 font-medium transition-colors disabled:opacity-50 " +
-                  (m.id === mode ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted")
-                }
-                title={m.blurb}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="relative flex items-center">
-            <Sparkles className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-muted-foreground" strokeWidth={2} />
-            <select
-              value={activeSkillId}
-              onChange={(e) => setActiveSkillId(e.target.value)}
-              className="rounded-md border border-border bg-card py-1 pl-7 pr-3 text-muted-foreground outline-none transition-colors hover:text-foreground"
-              title="Active skill (changes behaviour)"
-            >
-              <option value="">No skill</option>
-              {skills.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <Paperclip className="h-3.5 w-3.5" strokeWidth={2} />
-            Attach
-          </button>
-          <input ref={fileRef} type="file" multiple accept=".txt,.md,.markdown,.csv,.json,.log,.py,.js,.ts,.tsx,.html,.pdf" onChange={onAttach} className="hidden" />
-
-          {docs.map((d) => (
-            <span key={d.id} className="flex items-center gap-1.5 rounded-md border border-primary/20 bg-accent px-2.5 py-1 text-accent-foreground">
-              {d.name} · {d.chunks.length} chunks
-              <button onClick={() => setDocs((x) => x.filter((y) => y.id !== d.id))} className="text-accent-foreground/60 transition-colors hover:text-destructive" title="Remove">
-                <X className="h-3.5 w-3.5" strokeWidth={2.5} />
-              </button>
-            </span>
+          {turns.map((t) => (
+            <TurnView key={t.id} turn={t} onRate={(f) => rate(t.id, t.traceId, f)} />
           ))}
 
-          {mode === "reasoning" && (
-            <span className="ml-auto flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: aux?.reward?.ready ? "#10b981" : aux?.reward?.missing ? "#9ca3af" : "#f59e0b" }} />
-              reward {aux?.reward?.ready ? "ready" : aux?.reward?.missing ? "add reward-gate.gguf" : "loading"}
-            </span>
-          )}
+          {active && <ActiveTurn active={active} mode={mode} />}
+          {error && <p className="text-sm text-destructive">Error: {error}</p>}
+          <div ref={bottomRef} />
         </div>
 
-        <div className="flex items-end gap-2 rounded-lg border border-border bg-card p-2 shadow-sm transition-colors focus-within:border-primary/50">
-          <textarea
-            value={problem}
-            onChange={(e) => setProblem(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                start();
-              }
-            }}
-            placeholder={modelReady ? `Message · ${activeMode.label} mode  (Enter to send)` : "Load a model in Settings first…"}
-            rows={1}
-            className="max-h-40 min-h-[2.5rem] flex-1 resize-none bg-transparent px-3 py-2 text-[15px] outline-none placeholder:text-muted-foreground"
-          />
-          {!running ? (
-            <button
-              onClick={() => start()}
-              disabled={!problem.trim() || !modelReady}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
-              title="Send"
-            >
-              <ArrowUp className="h-5 w-5" strokeWidth={2.5} />
-            </button>
-          ) : (
-            <button onClick={stop} className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-destructive text-destructive-foreground" title="Stop">
-              <Square className="h-4 w-4 fill-current" strokeWidth={2} />
-            </button>
+        {/* Composer — pinned to the bottom */}
+        <div className="sticky bottom-5 mb-5 rounded-3xl border border-primary/20 bg-card/95 p-5 backdrop-blur-2xl shadow-[0_15px_50px_-20px_rgba(45,212,191,0.2),0_0_30px_rgba(45,212,191,0.02)]">
+          {remembered && (
+            <div className="mb-3 inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+              Remembered {remembered} detail{remembered > 1 ? "s" : ""} to memory
+            </div>
           )}
+
+          {/* Action Tools Toolbar Selector Bar Row */}
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+            <div className="flex rounded-xl border border-primary/20 bg-card/80 p-0.5">
+              {MODES.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setMode(m.id)}
+                  disabled={running}
+                  className={
+                    "rounded-lg px-3 py-1.5 font-medium transition-all duration-200 disabled:opacity-50 " +
+                    (m.id === mode
+                      ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+                      : "text-muted-foreground hover:bg-card/70 border border-transparent")
+                  }
+                  title={m.blurb}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative flex items-center">
+              <Sparkles className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-muted-foreground" strokeWidth={2} />
+              <select
+                value={activeSkillId}
+                onChange={(e) => setActiveSkillId(e.target.value)}
+                className="rounded-xl border border-primary/20 bg-card/70 py-1.5 pl-8 pr-3 text-muted-foreground outline-none focus:outline-none focus:ring-0 transition-colors hover:text-foreground"
+                title="Active skill (changes behaviour)"
+              >
+                <option value="">No skill</option>
+                {skills.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-card/80 px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Paperclip className="h-3.5 w-3.5" strokeWidth={2} />
+              Attach
+            </button>
+            <input ref={fileRef} type="file" multiple accept=".txt,.md,.markdown,.csv,.json,.log,.py,.js,.ts,.tsx,.html,.pdf" onChange={onAttach} className="hidden" />
+
+            {docs.map((d) => (
+              <span key={d.id} className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-foreground">
+                {d.name} · {d.chunks.length} chunks
+                <button onClick={() => setDocs((x) => x.filter((y) => y.id !== d.id))} className="text-muted-foreground transition-colors hover:text-destructive" title="Remove">
+                  <X className="h-3.5 w-3.5" strokeWidth={2.5} />
+                </button>
+              </span>
+            ))}
+
+            {mode === "reasoning" && (
+              <span className="ml-auto flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: aux?.reward?.ready ? "#10b981" : aux?.reward?.missing ? "#9ca3af" : "var(--primary)" }} />
+                reward {aux?.reward?.ready ? "ready" : aux?.reward?.missing ? "add reward-gate.gguf" : "loading"}
+              </span>
+            )}
+          </div>
+
+          {/* Input block box */}
+          <div className="flex items-end gap-2 rounded-2xl border border-primary/20 bg-card/80 p-2 shadow-sm transition-colors focus-within:border-primary/50">
+            <textarea
+              value={problem}
+              onChange={(e) => setProblem(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  start();
+                }
+              }}
+              placeholder={modelReady ? `Message · ${activeMode.label} mode (Enter to send)` : "Load a model in Settings first…"}
+              rows={1}
+              className="max-h-40 min-h-[2.5rem] flex-1 resize-none bg-transparent px-3 py-2 text-[15px] outline-none focus:outline-none focus:ring-0 placeholder:text-muted-foreground"
+            />
+            {!running ? (
+              <button
+                onClick={() => start()}
+                disabled={!problem.trim() || !modelReady}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground font-bold transition-opacity disabled:opacity-40"
+                title="Send"
+              >
+                <ArrowUp className="h-5 w-5" strokeWidth={2.5} />
+              </button>
+            ) : (
+              <button onClick={stop} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent text-accent-foreground" title="Stop">
+                <Square className="h-4 w-4 fill-current" strokeWidth={2} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </PolygonBackground>
   );
 }
 
-// live view during a run: the answer streams (finalized from think/answer as it
-// goes), with the raw steps shown below.
-function ActiveTurn({ active }: { active: { question: string; steps: StepView[]; sstate: Record<string, StepState> } }) {
+function ActiveTurn({ active, mode }: { active: { question: string; steps: StepView[]; sstate: Record<string, StepState> }, mode: Mode }) {
   const liveStep = [...active.steps].reverse().find((s) => s.kind === "solve" || s.kind === "answer");
   const liveText = liveStep ? active.sstate[liveStep.id]?.text ?? "" : "";
-  const liveAnswer = liveText ? finalizeAnswer(liveText) : "";
+  const liveAnswer = liveText ? finalizeAnswer(liveText, mode === "knowledge" || mode === "thinking") : "";
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex w-full flex-col gap-4">
       <UserBubble text={active.question} />
-      {/* pipeline / reasoning ABOVE the answer (like o1 / Claude) */}
       <div className="flex flex-col gap-3">
         {active.steps.map((view, i) => (
           <StepCard key={view.id} view={view} index={i} state={active.sstate[view.id] ?? { status: "running" }} />
         ))}
       </div>
-      <div className="rounded-lg rounded-bl-sm border border-border bg-card p-5 shadow-sm">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">Answer</div>
-        <div className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground caret">
+      <div className="rounded-3xl border border-primary/20 bg-card/85 p-6 shadow-sm">
+        <div className="text-xs font-bold uppercase tracking-[0.08em] text-primary">Answer</div>
+        <div className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground caret">
           {liveAnswer ? <MathText text={liveAnswer} /> : <span className="text-muted-foreground">thinking…</span>}
         </div>
       </div>
@@ -387,7 +397,7 @@ function ActiveTurn({ active }: { active: { question: string; steps: StepView[];
 function UserBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[85%] whitespace-pre-wrap rounded-lg rounded-br-sm bg-primary px-4 py-2.5 text-[15px] leading-relaxed text-primary-foreground shadow-sm">
+      <div className="max-w-[85%] whitespace-pre-wrap rounded-3xl border border-primary/30 bg-primary/5 px-5 py-3 text-[15px] leading-relaxed text-foreground shadow-sm backdrop-blur-sm">
         {text}
       </div>
     </div>
@@ -397,15 +407,14 @@ function UserBubble({ text }: { text: string }) {
 function TurnView({ turn, onRate }: { turn: Turn; onRate: (f: "up" | "down") => void }) {
   const [showSteps, setShowSteps] = useState(false);
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex w-full flex-col gap-4">
       <UserBubble text={turn.question} />
 
-      {/* reasoning / pipeline ABOVE the answer (collapsible, like o1 / Claude) */}
       {!!turn.steps.length && (
         <div className="flex flex-col gap-2.5">
           <button
             onClick={() => setShowSteps((s) => !s)}
-            className="flex items-center gap-1.5 self-start rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+            className="flex items-center gap-1.5 self-start rounded-xl border border-primary/20 bg-card/80 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             {showSteps ? <ChevronDown className="h-3.5 w-3.5" strokeWidth={2.5} /> : <ChevronRight className="h-3.5 w-3.5" strokeWidth={2.5} />}
             {showSteps ? "Hide reasoning" : "Show reasoning & pipeline"}
@@ -420,28 +429,27 @@ function TurnView({ turn, onRate }: { turn: Turn; onRate: (f: "up" | "down") => 
         </div>
       )}
 
-      {/* assistant answer BELOW */}
-      <div className="rounded-lg rounded-bl-sm border border-border bg-card p-5 shadow-sm">
+      <div className="rounded-3xl border border-primary/20 bg-card/85 p-6 shadow-sm">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">Answer</span>
+          <span className="text-xs font-bold uppercase tracking-[0.08em] text-primary">Answer</span>
           {turn.grounded && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
-              <BadgeCheck className="h-3 w-3" strokeWidth={2.5} />
+            <span className="inline-flex items-center gap-1 rounded-xl bg-primary/10 border border-primary/30 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-foreground">
+              <BadgeCheck className="h-3 w-3 text-primary" strokeWidth={2.5} />
               grounded by code
             </span>
           )}
         </div>
-        <div className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">
+        <div className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">
           <MathText text={turn.answer} />
         </div>
 
-        <div className="mt-4 flex items-center gap-2 border-t border-border pt-3">
-          <span className="text-[11px] font-medium text-muted-foreground">Helpful?</span>
+        <div className="mt-5 flex items-center gap-2 border-t border-primary/10 pt-4">
+          <span className="text-xs font-medium text-muted-foreground">Helpful?</span>
           <button
             onClick={() => onRate("up")}
             className={
-              "grid h-7 w-7 place-items-center rounded-md border transition-colors " +
-              (turn.feedback === "up" ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:text-foreground")
+              "grid h-7 w-7 place-items-center rounded-lg border transition-colors " +
+              (turn.feedback === "up" ? "border-primary bg-primary/10 text-foreground" : "border-primary/20 text-muted-foreground hover:text-foreground")
             }
             title="Helpful"
           >
@@ -450,14 +458,14 @@ function TurnView({ turn, onRate }: { turn: Turn; onRate: (f: "up" | "down") => 
           <button
             onClick={() => onRate("down")}
             className={
-              "grid h-7 w-7 place-items-center rounded-md border transition-colors " +
-              (turn.feedback === "down" ? "border-destructive bg-destructive text-destructive-foreground" : "border-border text-muted-foreground hover:text-foreground")
+              "grid h-7 w-7 place-items-center rounded-lg border transition-colors " +
+              (turn.feedback === "down" ? "border-destructive bg-destructive/20 text-destructive-foreground" : "border-primary/20 text-muted-foreground hover:text-foreground")
             }
             title="Not helpful"
           >
             <ThumbsDown className="h-3.5 w-3.5" strokeWidth={2} />
           </button>
-          {turn.feedback && <span className="text-[11px] text-muted-foreground">saved as {turn.feedback === "up" ? "positive" : "negative"} trace</span>}
+          {turn.feedback && <span className="text-xs text-muted-foreground ml-1">saved as {turn.feedback === "up" ? "positive" : "negative"} trace</span>}
         </div>
       </div>
     </div>

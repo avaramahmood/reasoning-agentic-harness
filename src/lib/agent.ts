@@ -91,12 +91,12 @@ export interface RunOpts {
 }
 
 const ACCENT: Record<StepKind, string> = {
-  answer: "#10b981",
-  solve: "#1c5fd6",
-  exec: "#f59e0b",
-  consolidate: "#14b8a6",
-  memory: "#8b5cf6",
-  gate: "#ec4899",
+  answer: "#2dd4bf",
+  solve: "#baaf73",
+  exec: "#2dd4bf",
+  consolidate: "#baaf73",
+  memory: "#baaf73",
+  gate: "#2dd4bf",
 };
 
 const GATE_THRESHOLD = 0.45; // bge-reranker val midpoint (pos~0.56 / neg~0.37)
@@ -409,7 +409,7 @@ async function reasonSolve(
     [{ role: "system", content: SYS_REASON + contextSystem(ctx) }, ...history, { role: "user", content: reactUser(problem) }],
     { maxTokens: 640, temperature: 0.3, signal, stop: REACT_STOPS, frequencyPenalty: 0.5, presencePenalty: 0.3, onToken: (_d, f) => ev.onToken(rid, f) }
   );
-  const answer = finalizeAnswer(full);
+  const answer = finalizeAnswer(full, true) || "(no answer)";
   ev.onResult(rid, { text: full, answer });
   return { full, answer, usedTool: false, grounded: false, verified: "" };
 }
@@ -518,7 +518,7 @@ export async function runAgent(
         onToken: (_d, f) => ev.onToken(id, f),
       }
     );
-    const answer = finalizeAnswer(full);
+    const answer = finalizeAnswer(full, true) || "(no answer)";
     ev.onResult(id, { text: full, answer });
     return { finalAnswer: answer, usedTool: false, toolGrounded: false };
   }

@@ -1,87 +1,119 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
 
+/* Brevis — the RIVA title/display face */
+@font-face {
+  font-family: 'Brevis';
+  src: url('./assets/brevis.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  --background: oklch(0.9940 0 0);
-  --foreground: oklch(0 0 0);
-  --card: oklch(0.9940 0 0);
-  --card-foreground: oklch(0 0 0);
-  --popover: oklch(0.9911 0 0);
-  --popover-foreground: oklch(0 0 0);
-  --primary: oklch(0.8545 0.1675 159.6564);
-  --primary-foreground: oklch(0 0 0);
-  --secondary: oklch(0.9933 0.0011 197.1390);
-  --secondary-foreground: oklch(0.1344 0 0);
-  --muted: oklch(0.9702 0 0);
-  --muted-foreground: oklch(0.4386 0 0);
-  --accent: oklch(0.9947 0.0074 164.9465);
-  --accent-foreground: oklch(0.6184 0.1489 155.4444);
-  --destructive: oklch(0.6665 0.2111 2.8306);
-  --destructive-foreground: oklch(1.0000 0 0);
-  --border: oklch(0.8650 0.0040 247.8581);
-  --input: oklch(0.8650 0 0);
-  --ring: oklch(0.8545 0.1675 159.6564);
-  --chart-1: oklch(0.8545 0.1675 159.6564);
-  --chart-2: oklch(0.8979 0.1884 146.5522);
-  --chart-3: oklch(0.6658 0.2215 29.2981);
-  --chart-4: oklch(0.7507 0.1401 230.8266);
-  --chart-5: oklch(0.8257 0.1067 48.5116);
-  --sidebar: oklch(1.0000 0 0);
-  --sidebar-foreground: oklch(0 0 0);
-  --sidebar-primary: oklch(0 0 0);
-  --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(0.9752 0.0307 168.3924);
-  --sidebar-accent-foreground: oklch(0 0 0);
-  --sidebar-border: oklch(0.9401 0 0);
-  --sidebar-ring: oklch(0 0 0);
-  --font-sans: Plus Jakarta Sans, sans-serif;
-  --font-serif: Lora, serif;
-  --font-mono: IBM Plex Mono, monospace;
-  --radius: 0.5rem;
-  --shadow-2xs: 0 1px 2px 0px hsl(0 0% 0% / 0.03);
-  --shadow-xs: 0 1px 2px 0px hsl(0 0% 0% / 0.04);
-  --shadow-sm: 0 1px 2px 0px hsl(0 0% 0% / 0.05), 0 1px 3px -1px hsl(0 0% 0% / 0.05);
-  --shadow: 0 1px 2px 0px hsl(0 0% 0% / 0.06), 0 2px 6px -1px hsl(0 0% 0% / 0.05);
-  --shadow-md: 0 2px 4px -1px hsl(0 0% 0% / 0.06), 0 4px 10px -2px hsl(0 0% 0% / 0.06);
-  --shadow-lg: 0 4px 8px -2px hsl(0 0% 0% / 0.07), 0 12px 24px -4px hsl(0 0% 0% / 0.07);
-  --shadow-xl: 0 8px 16px -4px hsl(0 0% 0% / 0.08), 0 20px 32px -8px hsl(0 0% 0% / 0.08);
-  --shadow-2xl: 0 24px 48px -12px hsl(0 0% 0% / 0.18);
+  /* ==========================================================================
+     CORE SURFACES (soft dark base — palette is TEAL + very light GOLDEN)
+     ========================================================================== */
+  --background: #0a0d0f;           /* near-black with a faint teal-grey */
+  --foreground: #f3efe2;           /* warm off-white (light golden tint) */
+  --card: #11161a;
+  --card-foreground: #ece7d8;
+  --popover: #151b20;
+  --popover-foreground: #ece7d8;
+
+  /* ==========================================================================
+     ACCENTS — teal (interactive) + very light golden (highlights)
+     ========================================================================== */
+  --primary: #2dd4bf;              /* teal — the pop colour for actions */
+  --primary-foreground: #06231f;   /* dark ink for legible text on teal */
+  --secondary: #17201f;            /* muted teal-slate block */
+  --secondary-foreground: #e7e0cf;
+  --accent: #baaf73;              /* very light golden highlight */
+  --accent-foreground: #11110b;
+
+  /* ==========================================================================
+     DESTRUCTIVE & BORDERS
+     ========================================================================== */
+  --destructive: #e8636f;
+  --destructive-foreground: #ffffff;
+  --border: rgba(186, 175, 115, 0.20); /* light golden hairline */
+  --input: #11161a;
+  --ring: #2dd4bf;                 /* teal focus ring */
+
+  /* ==========================================================================
+     CHART PALETTE (teal / gold harmony)
+     ========================================================================== */
+  --chart-1: #2dd4bf;
+  --chart-2: #baaf73;
+  --chart-3: #5eead4;
+  --chart-4: rgba(45, 212, 191, 0.5);
+  --chart-5: #8a7a44;
+
+  /* ==========================================================================
+     SIDEBAR PALETTE
+     ========================================================================== */
+  --sidebar: #0c1012;
+  --sidebar-foreground: #ece7d8;
+  --sidebar-primary: #2dd4bf;
+  --sidebar-primary-foreground: #06231f;
+  --sidebar-accent: #17201f;
+  --sidebar-accent-foreground: #e7e0cf;
+  --sidebar-border: rgba(186, 175, 115, 0.16);
+  --sidebar-ring: #2dd4bf;
+
+  /* muted */
+  --muted: #1b2320;
+  --muted-foreground: #b6ad94;     /* warm sand-grey — legible secondary text */
+
+  /* ==========================================================================
+     TYPOGRAPHY & METRICS
+     ========================================================================== */
+  --font-sans: 'Montserrat', sans-serif;
+  --font-serif: 'Montserrat', sans-serif;
+  --font-mono: 'Montserrat', sans-serif;
+  --font-display: 'Brevis', 'Montserrat', sans-serif;
+
+  --radius: 1rem;
+  --shadow-2xs: 0 1px 2px 0px rgba(4, 10, 9, 0.20);
+  --shadow-xs: 0 1px 2px 0px rgba(4, 10, 9, 0.24);
+  --shadow-sm: 0 1px 2px 0px rgba(4, 10, 9, 0.28), 0 1px 3px -1px rgba(4, 10, 9, 0.28);
+  --shadow: 0 1px 2px 0px rgba(4, 10, 9, 0.30), 0 2px 6px -1px rgba(4, 10, 9, 0.28);
+  --shadow-md: 0 2px 4px -1px rgba(4, 10, 9, 0.32), 0 4px 10px -2px rgba(4, 10, 9, 0.30);
+  --shadow-lg: 0 4px 8px -2px rgba(4, 10, 9, 0.34), 0 12px 24px -4px rgba(4, 10, 9, 0.34);
+  --shadow-xl: 0 8px 16px -4px rgba(4, 10, 9, 0.38), 0 20px 32px -8px rgba(4, 10, 9, 0.38);
+  --shadow-2xl: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
 }
 
 .dark {
-  --background: oklch(0 0 0);
-  --foreground: oklch(0.9551 0 0);
-  --card: oklch(0.1448 0 0);
-  --card-foreground: oklch(0.9551 0 0);
-  --popover: oklch(0.2210 0.0015 197.0452);
-  --popover-foreground: oklch(0.9551 0 0);
-  --primary: oklch(0.8545 0.1675 159.6564);
-  --primary-foreground: oklch(0 0 0);
-  --secondary: oklch(0.4700 0.0900 160.0079);
-  --secondary-foreground: oklch(0.9551 0 0);
-  --muted: oklch(0.2653 0.0037 286.1465);
-  --muted-foreground: oklch(0.6731 0 0);
-  --accent: oklch(46.91% 0.09133 160.554);
-  --accent-foreground: oklch(0.9970 0 0);
-  --destructive: oklch(0.7425 0.1696 1.0847);
-  --destructive-foreground: oklch(1.0000 0 0);
-  --border: oklch(0.3200 0.0030 286.2347);
-  --input: oklch(0.3800 0 0);
-  --ring: oklch(0.8545 0.1675 159.6564);
-  --chart-1: oklch(0.8545 0.1675 159.6564);
-  --chart-2: oklch(0.9173 0.1562 144.8458);
-  --chart-3: oklch(0.8531 0.0883 357.4250);
-  --chart-4: oklch(0.8104 0.1216 228.4326);
-  --chart-5: oklch(0.8257 0.1067 48.5116);
-  --sidebar: oklch(0.1448 0 0);
-  --sidebar-foreground: oklch(0.9551 0 0);
-  --sidebar-primary: oklch(0.8545 0.1675 159.6564);
-  --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(0.2824 0.0678 156.5634);
-  --sidebar-accent-foreground: oklch(0.8545 0.1675 159.6564);
-  --sidebar-border: oklch(0.3452 0.0098 241.9410);
-  --sidebar-ring: oklch(0.8545 0.1675 159.6564);
+  --background: #0a0d0f;
+  --foreground: #f3efe2;
+  --card: #11161a;
+  --card-foreground: #ece7d8;
+  --popover: #151b20;
+  --popover-foreground: #ece7d8;
+  --primary: #2dd4bf;
+  --primary-foreground: #06231f;
+  --secondary: #17201f;
+  --secondary-foreground: #e7e0cf;
+  --muted: #1b2320;
+  --muted-foreground: #b6ad94;
+  --accent: #baaf73;
+  --accent-foreground: #11110b;
+  --destructive: #e8636f;
+  --destructive-foreground: #ffffff;
+  --border: rgba(186, 175, 115, 0.24);
+  --input: #11161a;
+  --ring: #2dd4bf;
+  --sidebar: #0c1012;
+  --sidebar-foreground: #ece7d8;
+  --sidebar-primary: #2dd4bf;
+  --sidebar-primary-foreground: #06231f;
+  --sidebar-accent: #17201f;
+  --sidebar-accent-foreground: #e7e0cf;
+  --sidebar-border: rgba(186, 175, 115, 0.20);
+  --sidebar-ring: #2dd4bf;
 }
 
 @theme inline {
@@ -109,7 +141,7 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
+  --sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
@@ -121,9 +153,10 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
+  --font-display: var(--font-display);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 3px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
@@ -140,6 +173,7 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    font-family: var(--font-sans) !important;
   }
   body {
     @apply bg-background text-foreground;
@@ -148,8 +182,12 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
+  /* the RIVA display face wins over the global sans */
+  .font-display {
+    font-family: var(--font-display) !important;
+  }
   ::selection {
-    background: color-mix(in oklab, var(--primary) 30%, transparent);
+    background: color-mix(in oklab, var(--primary) 40%, transparent);
   }
 }
 
@@ -161,13 +199,8 @@ body,
 }
 
 @keyframes blink {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.25;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
 }
 @keyframes rise {
   from {
@@ -197,6 +230,6 @@ body,
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: rgba(45, 212, 191, 0.30); /* teal scroll trail */
   border-radius: 999px;
 }

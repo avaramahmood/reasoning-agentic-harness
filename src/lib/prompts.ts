@@ -220,11 +220,12 @@ function isMostlyJunk(s: string): boolean {
 // in <think> and degenerates inside <answer>, so: prefer a clean <answer> tag,
 // else fall back to the <think> content, else the whole cleaned output. All
 // cleaned of spew/loops/foreign-script and stripped of tags.
-export function finalizeAnswer(full: string): string {
+export function finalizeAnswer(full: string, strict: boolean = false): string {
   const strip = (s: string) =>
     s.replace(/<\/?(think|answer)>/gi, " ").replace(/[^\x09\x0A\x0D\x20-\x7E]+$/g, "").replace(/\n{3,}/g, "\n\n").trim();
   const ans = cleanModelOutput(answerTagContent(full));
   if (ans && !isMostlyJunk(ans)) return strip(ans);
+  if (strict) return "";
   const think = cleanModelOutput(extractThink(full));
   if (think && !isMostlyJunk(think)) return strip(think);
   const whole = cleanModelOutput(full.replace(/<\/?(think|answer)>/gi, " "));
